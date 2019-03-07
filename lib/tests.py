@@ -17,7 +17,7 @@
 
 import pytest
 import mock
-from routing import Plugin, UrlRule, RoutingError, Script
+from routing import Plugin, Script, UrlRule, RoutingError
 
 
 @pytest.fixture()
@@ -25,6 +25,7 @@ def plugin():
     return Plugin('plugin://py.test')
 
 
+# Normally, we'd be testing both, but there's currently nothing that Script does and Plugin doesn't do
 @pytest.fixture()
 def script():
     return Script('script://py.test')
@@ -62,7 +63,7 @@ def test_url_for_kwargs(plugin):
     f = lambda a, b2: None
     plugin.route("/foo/<a>/<b2>")(f)
     assert plugin.url_for(f, a=1, b2=2) == plugin.base_url + "/foo/1/2"
-    
+
 
 def test_url_for_args(plugin):
     f = lambda a, b2, c, d: None
