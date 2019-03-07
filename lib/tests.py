@@ -17,12 +17,17 @@
 
 import pytest
 import mock
-from routing import Plugin, UrlRule, RoutingError
+from routing import Plugin, UrlRule, RoutingError, Script
 
 
 @pytest.fixture()
 def plugin():
     return Plugin('plugin://py.test')
+
+
+@pytest.fixture()
+def script():
+    return Script('script://py.test')
 
 
 def test_match():
@@ -54,15 +59,15 @@ def test_url_for(plugin):
 
 
 def test_url_for_kwargs(plugin):
-    f = lambda a, b: None
-    plugin.route("/foo/<a>/<b>")(f)
-    assert plugin.url_for(f, a=1, b=2) == plugin.base_url + "/foo/1/2"
-
+    f = lambda a, b2: None
+    plugin.route("/foo/<a>/<b2>")(f)
+    assert plugin.url_for(f, a=1, b2=2) == plugin.base_url + "/foo/1/2"
+    
 
 def test_url_for_args(plugin):
-    f = lambda a, b: None
-    plugin.route("/<a>/<b>")(f)
-    assert plugin.url_for(f, 1, 2) == plugin.base_url + "/1/2"
+    f = lambda a, b2, c, d: None
+    plugin.route("/<a>/<b2>/<c>/<d>")(f)
+    assert plugin.url_for(f, 1, 2.6, True, 'baz') == plugin.base_url + "/1/2.6/True/baz"
 
 
 def test_route_for(plugin):
@@ -73,8 +78,14 @@ def test_route_for(plugin):
 
 def test_route_for_args(plugin):
     f = lambda: None
-    plugin.route("/foo/<a>/<b>")(f)
-    assert plugin.route_for(plugin.base_url + "/foo/1/2") is f
+    g = lambda: (None, None)  # just to make sure that they are easily different
+    plugin.route("/foo/<a>/<b2>")(f)
+    plugin.route("/foo/a/b")(g)
+
+    # due to the unpredictable sorting of dict, just do it 100 times to see if it fails
+    for i in range(0, 100):
+        assert plugin.route_for(plugin.base_url + "/foo/1/2") is f
+        assert plugin.route_for(plugin.base_url + "/foo/a/b") is g
 
 
 def test_dispatch(plugin):
@@ -99,5 +110,12 @@ def test_no_route(plugin):
 def test_arg_parsing(plugin):
     f = mock.create_autospec(lambda: None)
     plugin.route("/foo")(f)
-    plugin.run(['plugin://py.test/foo', '0', '?bar=baz'])
-    assert plugin.args['bar'][0] == 'baz'
+    plugin.run(['plugin://py.test/foo', '0', '?bar=baz&bar2=baz2'])
+    assert plugin.args['bar'][0] == 'baz' and plugin.args['bar2'][0] == 'baz2'
+
+
+def test_arg_conversion(plugin):
+    def test_arg_conversion_inner(a, b2, c, d):
+        assert a == 'bar' and b2 == True and c == 16.4 and d == 9
+    plugin.route("/foo/<a>/<b2>/<c>/<d>")(test_arg_conversion_inner)
+    plugin.run(['plugin://py.test/foo/bar/true/16.4/9', '0', ''])

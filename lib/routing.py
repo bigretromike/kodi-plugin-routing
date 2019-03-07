@@ -43,22 +43,26 @@ class RoutingError(Exception):
     pass
 
 
-class Plugin(object):
+class Addon(object):
     """
-    :ivar handle: The plugin handle from kodi
-    :type handle: int
-
+    The base class for routing.Plugin, Script, and any others that may be added
     :ivar args: The parsed query string.
     :type args: dict of byte strings
+
+    :ivar base_url: the base_url of the addon, ex. plugin://plugin.video.something_plugin
+    :type base_url: str
+
+    :ivar convert_args: Convert arguments to basic types
+    :type convert_args: bool
     """
 
-    def __init__(self, base_url=None):
+    def __init__(self, base_url=None, convert_args=False):
         self._rules = {}  # function to list of rules
-        self.handle = int(sys.argv[1]) if sys.argv[1].isdigit() else -1
         self.args = {}
         self.base_url = base_url
+        self.convert_args = convert_args
         if self.base_url is None:
-            self.base_url = "plugin://" + xbmcaddon.Addon().getAddonInfo('id')
+            self.base_url = xbmcaddon.Addon().getAddonInfo('id')
 
     def route_for(self, path):
         """
@@ -69,6 +73,13 @@ class Plugin(object):
         if path.startswith(self.base_url):
             path = path.split(self.base_url, 1)[1]
 
+        # first, search for exact matches
+        for view_fun, rules in iter(self._rules.items()):
+            for rule in rules:
+                if rule.exact_match(path):
+                    return view_fun
+
+        # then, search for regex matches
         for view_fun, rules in iter(self._rules.items()):
             for rule in rules:
                 if rule.match(path) is not None:
@@ -121,23 +132,58 @@ class Plugin(object):
         for view_func, rules in iter(self._rules.items()):
             for rule in rules:
                 kwargs = rule.match(path)
-                if kwargs is not None:
-                    log("Dispatching to '%s', args: %s" % (view_func.__name__, kwargs))
-                    view_func(**kwargs)
+                if not kwargs:
                     return
+                if self.convert_args:
+                    for k, v in kwargs.items():
+                        new_val = try_convert(v)
+                        if new_val:
+                            kwargs[k] = new_val
+                log("Dispatching to '%s', args: %s" % (view_func.__name__, kwargs))
+                view_func(**kwargs)
+                return
         raise RoutingError('No route to path "%s"' % path)
 
 
-class UrlRule(object):
+class Plugin(Addon):
+    """
+    A routing handler bound to a kodi plugin
+    :ivar handle: The plugin handle from kodi
+    :type handle: int
+    """
 
+    def __init__(self, base_url=None, convert_args=False):
+        self.base_url = base_url
+        if self.base_url is None:
+            self.base_url = "plugin://" + xbmcaddon.Addon().getAddonInfo('id')
+        super().__init__(self.base_url, convert_args)
+        if len(sys.argv) < 2:
+            # we are probably not dealing with a plugin, or it was called incorrectly from an addon
+            raise TypeError('There was no handle provided. This needs to be called from a Kodi Plugin.')
+        self.handle = int(sys.argv[1]) if sys.argv[1].isdigit() else -1
+
+
+class Script(Addon):
+    """
+    A routing handler bound to a kodi script
+    """
+
+    def __init__(self, base_url=None, convert_args=False):
+        super().__init__(base_url, convert_args)
+
+
+class UrlRule(object):
     def __init__(self, pattern):
-        kw_pattern = r'<(?:[^:]+:)?([A-z]+)>'
+        arg_regex = re.compile('<([A-z][A-z0-9]*)>')
+        self._has_args = bool(arg_regex.search(pattern))
+
+        kw_pattern = r'<(?:[^:]+:)?([A-z][A-z0-9]*)>'
         self._pattern = re.sub(kw_pattern, '{\\1}', pattern)
         self._keywords = re.findall(kw_pattern, pattern)
 
-        p = re.sub('<([A-z]+)>', '<string:\\1>', pattern)
-        p = re.sub('<string:([A-z]+)>', '(?P<\\1>[^/]+?)', p)
-        p = re.sub('<path:([A-z]+)>', '(?P<\\1>.*)', p)
+        p = re.sub('<([A-z][A-z0-9]*)>', '<string:\\1>', pattern)
+        p = re.sub('<string:([A-z][A-z0-9]*)>', '(?P<\\1>[^/]+?)', p)
+        p = re.sub('<path:([A-z][A-z0-9]*)>', '(?P<\\1>.*)', p)
         self._compiled_pattern = p
         self._regex = re.compile('^' + p + '$')
 
@@ -150,6 +196,9 @@ class UrlRule(object):
         match = self._regex.search(path)
         return match.groupdict() if match else None
 
+    def exact_match(self, path):
+        return not self._has_args and self._pattern == path
+
     def make_path(self, *args, **kwargs):
         """Construct a path from arguments."""
         if args and kwargs:
@@ -157,7 +206,7 @@ class UrlRule(object):
         if args:
             # Replace the named groups %s and format
             try:
-                return re.sub(r'{[A-z]+}', r'%s', self._pattern) % args
+                return re.sub(r'{[A-z][A-z0-9]*}', r'%s', self._pattern) % args
             except TypeError:
                 return None
 
@@ -174,3 +223,31 @@ class UrlRule(object):
 
     def __str__(self):
         return b"Rule(pattern=%s, keywords=%s)" % (self._pattern, self._keywords)
+
+
+def try_convert(value):
+    """
+    Try to convert to some common types
+    :param value: the string to convert
+    :type value: str
+    """
+    # for some of these, they are simplistic and not the generally preferred way
+    # this is a special case, so I don't care
+
+    # try to convert to int
+    if all(x.isdigit() for x in value):
+        return int(value)
+
+    # try to convert to float. We've already check ints, so just try/except
+    try:
+        return float(value)
+    except:
+        pass
+
+    # try to convert to bool
+    if value.lower() == 'true':
+        return True
+    if value.lower() == 'false':
+        return False
+
+    return None
