@@ -156,7 +156,7 @@ class Plugin(Addon):
         self.base_url = base_url
         if self.base_url is None:
             self.base_url = "plugin://" + xbmcaddon.Addon().getAddonInfo('id')
-        super().__init__(self.base_url, convert_args)
+        Addon.__init__(self, self.base_url, convert_args)
         if len(sys.argv) < 2:
             # we are probably not dealing with a plugin, or it was called incorrectly from an addon
             raise TypeError('There was no handle provided. This needs to be called from a Kodi Plugin.')
@@ -169,7 +169,7 @@ class Script(Addon):
     """
 
     def __init__(self, base_url=None, convert_args=False):
-        super().__init__(base_url, convert_args)
+        Addon.__init__(self, base_url, convert_args)
 
 
 class UrlRule(object):
