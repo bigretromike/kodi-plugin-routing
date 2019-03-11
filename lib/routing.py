@@ -131,9 +131,18 @@ class Addon(object):
     def _dispatch(self, path):
         for view_func, rules in iter(self._rules.items()):
             for rule in rules:
+                if not rule.exact_match(path):
+                    continue
+                log("Dispatching to '%s', exact match" % view_func.__name__)
+                view_func()
+                return
+
+        # then, search for regex matches
+        for view_func, rules in iter(self._rules.items()):
+            for rule in rules:
                 kwargs = rule.match(path)
-                if not kwargs:
-                    return
+                if kwargs is None:
+                    continue
                 if self.convert_args:
                     for k, v in kwargs.items():
                         new_val = try_convert(v)

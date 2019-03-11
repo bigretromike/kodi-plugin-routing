@@ -25,6 +25,11 @@ def plugin():
     return Plugin('plugin://py.test')
 
 
+@pytest.fixture()
+def plugin_convert():
+    return Plugin('plugin://py.test', convert_args=True)
+
+
 # Normally, we'd be testing both, but there's currently nothing that Script does and Plugin doesn't do
 @pytest.fixture()
 def script():
@@ -115,8 +120,8 @@ def test_arg_parsing(plugin):
     assert plugin.args['bar'][0] == 'baz' and plugin.args['bar2'][0] == 'baz2'
 
 
-def test_arg_conversion(plugin):
+def test_arg_conversion(plugin_convert):
     def test_arg_conversion_inner(a, b2, c, d):
         assert a == 'bar' and b2 == True and c == 16.4 and d == 9
-    plugin.route("/foo/<a>/<b2>/<c>/<d>")(test_arg_conversion_inner)
-    plugin.run(['plugin://py.test/foo/bar/true/16.4/9', '0', ''])
+    plugin_convert.route("/foo/<a>/<b2>/<c>/<d>")(test_arg_conversion_inner)
+    plugin_convert.run(['plugin://py.test/foo/bar/true/16.4/9', '0', ''])
