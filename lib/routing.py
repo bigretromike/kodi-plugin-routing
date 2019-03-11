@@ -180,6 +180,15 @@ class Script(Addon):
     def __init__(self, base_url=None, convert_args=False):
         Addon.__init__(self, base_url, convert_args)
 
+    def run(self, argv=sys.argv):
+        if len(argv) > 1:
+            self.args = parse_qs(argv[1].lstrip('?'))
+            path = urlsplit(argv[1]).path or '/'
+        else:
+            temp = urlsplit(argv[0]).path
+            path = temp if temp != self.base_url else '/'
+        self._dispatch(path)
+
 
 class UrlRule(object):
     def __init__(self, pattern):
