@@ -146,7 +146,7 @@ class Addon(object):
                 if self.convert_args:
                     for k, v in kwargs.items():
                         new_val = try_convert(v)
-                        if new_val:
+                        if new_val != v:
                             kwargs[k] = new_val
                 log("Dispatching to '%s', args: %s" % (view_func.__name__, kwargs))
                 view_func(**kwargs)
