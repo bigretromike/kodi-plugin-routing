@@ -268,4 +268,4 @@ def try_convert(value):
     if value.lower() == 'false':
         return False
 
-    return None
+    return value
