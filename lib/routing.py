@@ -229,7 +229,7 @@ class UrlRule(object):
             try:
                 args = tuple(quote(quote(str(x), ''), '') for x in args)
                 return re.sub(r'{[A-z][A-z0-9]*}', r'%s', self._pattern) % args
-            except TypeError as ex:
+            except TypeError:
                 return None
 
         # We need to find the keys from kwargs that occur in our pattern.
