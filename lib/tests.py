@@ -94,6 +94,18 @@ def test_route_for_args(plugin):
         assert plugin.route_for(plugin.base_url + "/foo/a/b") is g
 
 
+def test_path_args(plugin):
+    url = 'http://foo.bar:80/baz/bax.json?foo=bar&baz=bay'
+
+    def test_path_args_inner(something):
+        assert something == url
+
+    plugin.route('/do/<path:something>')(test_path_args_inner)
+    path = plugin.url_for(test_path_args_inner, url)
+    assert plugin.route_for(path) is test_path_args_inner
+    plugin.run([path, '0', ''])
+
+
 def test_dispatch(plugin):
     f = mock.create_autospec(lambda: None)
     plugin.route("/foo")(f)

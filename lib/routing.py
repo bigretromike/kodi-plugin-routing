@@ -22,9 +22,9 @@ try:
 except ImportError:
     from urllib.parse import urlsplit, parse_qs
 try:
-    from urllib import urlencode
+    from urllib import urlencode, quote, unquote
 except ImportError:
-    from urllib.parse import urlencode
+    from urllib.parse import urlencode, quote, unquote
 
 try:
     import xbmc
@@ -212,7 +212,10 @@ class UrlRule(object):
         """
         # match = self._regex.search(urlsplit(path).path)
         match = self._regex.search(path)
-        return match.groupdict() if match else None
+        if match is None:
+            return None
+        match = dict((k, unquote(unquote(v))) for k, v in match.groupdict().items())
+        return match
 
     def exact_match(self, path):
         return not self._has_args and self._pattern == path
@@ -224,8 +227,9 @@ class UrlRule(object):
         if args:
             # Replace the named groups %s and format
             try:
+                args = tuple(quote(quote(str(x), ''), '') for x in args)
                 return re.sub(r'{[A-z][A-z0-9]*}', r'%s', self._pattern) % args
-            except TypeError:
+            except TypeError as ex:
                 return None
 
         # We need to find the keys from kwargs that occur in our pattern.
