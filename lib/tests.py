@@ -103,8 +103,9 @@ def test_path_args(plugin):
     plugin.route('/do/<path:a>')(f)
     path = plugin.url_for(f, url)
     assert plugin.route_for(path) is f
-    plugin.run([path, '0', ''])
+    plugin.run([path, '0', '?foo=bar&baz=bay'])
     f.assert_called_with(url)
+    assert plugin.args['foo'][0] == 'bar' and plugin.args['baz'][0] == 'bay'
 
 
 def test_dispatch(plugin):
