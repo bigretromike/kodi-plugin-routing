@@ -141,10 +141,7 @@ class Addon(object):
                 if kwargs is None:
                     continue
                 if self.convert_args:
-                    for k, v in kwargs.items():
-                        new_val = try_convert(v)
-                        if new_val != v:
-                            kwargs[k] = new_val
+                    kwargs = dict((k, try_convert(v)) for k, v in kwargs.items())
                 log("Dispatching to '%s', args: %s" % (view_func.__name__, kwargs))
                 view_func(**kwargs)
                 return
