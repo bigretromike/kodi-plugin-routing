@@ -278,4 +278,5 @@ def try_convert(value):
     if value.lower() == 'false':
         return False
 
+    # the original is str, so we can "convert" to str by just returning
     return value
