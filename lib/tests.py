@@ -89,21 +89,22 @@ def test_route_for_args(plugin):
     plugin.route("/foo/a/b")(g)
 
     # due to the unpredictable sorting of dict, just do it 100 times to see if it fails
+    # This is done because the exact_match processing did not exist, and it failed depending on order
     for i in range(0, 100):
         assert plugin.route_for(plugin.base_url + "/foo/1/2") is f
         assert plugin.route_for(plugin.base_url + "/foo/a/b") is g
 
 
 def test_path_args(plugin):
+    # full test to ensure that a path is both created properly and preserved throughout
     url = 'http://foo.bar:80/baz/bax.json?foo=bar&baz=bay'
+    f = mock.create_autospec(lambda a: None)
 
-    def test_path_args_inner(something):
-        assert something == url
-
-    plugin.route('/do/<path:something>')(test_path_args_inner)
-    path = plugin.url_for(test_path_args_inner, url)
-    assert plugin.route_for(path) is test_path_args_inner
+    plugin.route('/do/<path:a>')(f)
+    path = plugin.url_for(f, url)
+    assert plugin.route_for(path) is f
     plugin.run([path, '0', ''])
+    f.assert_called_with(url)
 
 
 def test_dispatch(plugin):
@@ -133,7 +134,7 @@ def test_arg_parsing(plugin):
 
 
 def test_arg_conversion(plugin_convert):
-    def test_arg_conversion_inner(a, b2, c, d):
-        assert a == 'bar' and b2 == True and c == 16.4 and d == 9
-    plugin_convert.route("/foo/<a>/<b2>/<c>/<d>")(test_arg_conversion_inner)
+    f = mock.create_autospec(lambda a, b2, c, d: None)
+    plugin_convert.route("/foo/<a>/<b2>/<c>/<d>")(f)
     plugin_convert.run(['plugin://py.test/foo/bar/true/16.4/9', '0', ''])
+    f.assert_called_with('bar', True, 16.4, 9)

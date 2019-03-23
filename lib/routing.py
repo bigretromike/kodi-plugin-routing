@@ -120,10 +120,7 @@ class Addon(object):
         self._rules[func].append(rule)
 
     def run(self, argv=sys.argv):
-        if len(argv) > 2:
-            self.args = parse_qs(argv[2].lstrip('?'))
-        path = urlsplit(argv[0]).path or '/'
-        self._dispatch(path)
+        pass
 
     def redirect(self, path):
         self._dispatch(path)
@@ -171,6 +168,15 @@ class Plugin(Addon):
             raise TypeError('There was no handle provided. This needs to be called from a Kodi Plugin.')
         self.handle = int(sys.argv[1]) if sys.argv[1].isdigit() else -1
 
+    def run(self, argv=sys.argv):
+        # argv[1] is handle, so skip to 2
+        if len(argv) > 2:
+            # parse query
+            self.args = parse_qs(argv[2].lstrip('?'))
+        # handle ['plugin.video.fun/some/menu']
+        path = urlsplit(argv[0]).path or '/'
+        self._dispatch(path)
+
 
 class Script(Addon):
     """
@@ -182,9 +188,12 @@ class Script(Addon):
 
     def run(self, argv=sys.argv):
         if len(argv) > 1:
+            # parse query
             self.args = parse_qs(argv[1].lstrip('?'))
+            # handle ['script.module.fun', '/do/something']
             path = urlsplit(argv[1]).path or '/'
         else:
+            # handle ['script.module.fun/do/something']
             temp = urlsplit(argv[0]).path
             path = temp if temp != self.base_url else '/'
         self._dispatch(path)
