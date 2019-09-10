@@ -168,16 +168,16 @@ class UrlRule:
 
     def __init__(self, pattern):
         pattern = pattern.rstrip('/')
-        arg_regex = re.compile('<([A-z][A-z0-9]*)>')
+        arg_regex = re.compile('<([A-z_][A-z0-9_]*)>')
         self._has_args = bool(arg_regex.search(pattern))
 
-        kw_pattern = r'<(?:[^:]+:)?([A-z][A-z0-9]*)>'
+        kw_pattern = r'<(?:[^:]+:)?([A-z_][A-z0-9_]*)>'
         self._pattern = re.sub(kw_pattern, '{\\1}', pattern)
         self._keywords = re.findall(kw_pattern, pattern)
 
-        p = re.sub('<([A-z][A-z0-9]*)>', '<string:\\1>', pattern)
-        p = re.sub('<string:([A-z][A-z0-9]*)>', '(?P<\\1>[^/]+?)', p)
-        p = re.sub('<path:([A-z][A-z0-9]*)>', '(?P<\\1>.*)', p)
+        p = re.sub('<([A-z_][A-z0-9_]*)>', '<string:\\1>', pattern)
+        p = re.sub('<string:([A-z_][A-z0-9_]*)>', '(?P<\\1>[^/]+?)', p)
+        p = re.sub('<path:([A-z_][A-z0-9_]*)>', '(?P<\\1>.*)', p)
         self._compiled_pattern = p
         self._regex = re.compile('^' + p + '$')
 
@@ -200,7 +200,7 @@ class UrlRule:
         if args:
             # Replace the named groups %s and format
             try:
-                return re.sub(r'{[A-z][A-z0-9]*}', r'%s', self._pattern) % args
+                return re.sub(r'{[A-z_][A-z0-9_]*}', r'%s', self._pattern) % args
             except TypeError:
                 return None
 

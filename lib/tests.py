@@ -56,14 +56,14 @@ def test_url_for(plugin):
 
 
 def test_url_for_kwargs(plugin):
-    f = lambda a, b2: None
-    plugin.route("/foo/<a>/<b2>")(f)
-    assert plugin.url_for(f, a=1, b2=2) == plugin.base_url + "/foo/1/2"
+    f = lambda a, var_with_num_underscore2: None
+    plugin.route("/foo/<a>/<var_with_num_underscore2>")(f)
+    assert plugin.url_for(f, a=1, var_with_num_underscore2=2) == plugin.base_url + "/foo/1/2"
 
 
 def test_url_for_args(plugin):
-    f = lambda a, b2, c, d: None
-    plugin.route("/<a>/<b2>/<c>/<d>")(f)
+    f = lambda a, var_with_num_underscore2, c, d: None
+    plugin.route("/<a>/<var_with_num_underscore2>/<c>/<d>")(f)
     assert plugin.url_for(f, 1, 2.6, True, 'baz') == plugin.base_url + "/1/2.6/True/baz"
 
 
@@ -74,9 +74,9 @@ def test_route_for(plugin):
 
 
 def test_route_for_args(plugin):
-    f = lambda: None
+    f = lambda a, var_with_num_underscore2: None
     g = lambda: (None, None)  # just to make sure that they are easily different
-    plugin.route("/foo/<a>/<b2>")(f)
+    plugin.route("/foo/<a>/<var_with_num_underscore2>")(f)
     plugin.route("/foo/a/b")(g)
 
     # due to the unpredictable sorting of dict, just do it 100 times to see if it fails
