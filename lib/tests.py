@@ -80,7 +80,7 @@ def test_route_for_args(plugin):
     plugin.route("/foo/a/b")(g)
 
     # due to the unpredictable sorting of dict, just do it 100 times to see if it fails
-    for i in range(0, 100):
+    for _ in range(0, 100):
         assert plugin.route_for(plugin.base_url + "/foo/1/2") is f
         assert plugin.route_for(plugin.base_url + "/foo/a/b") is g
 
@@ -120,6 +120,7 @@ def test_arg_parsing(plugin):
     plugin.run(['plugin://py.test/foo', '0', '?bar=baz&bar2=baz2'])
     assert plugin.args['bar'][0] == 'baz' and plugin.args['bar2'][0] == 'baz2'
 
+
 def test_trailing_slash_in_route_definition(plugin):
     """ Should call registered route with trailing slash. """
     f = mock.create_autospec(lambda: None)
@@ -127,12 +128,14 @@ def test_trailing_slash_in_route_definition(plugin):
     plugin.run(['plugin://py.test/foo', '0'])
     assert f.call_count == 1
 
+
 def test_trailing_slashes_in_run(plugin):
     """ Should call registered route without trailing slash. """
     f = mock.create_autospec(lambda: None)
     plugin.route("/foo")(f)
     plugin.run(['plugin://py.test/foo/', '0'])
     assert f.call_count == 1
+
 
 def test_trailing_slash_handling_for_root(plugin):
     f = mock.create_autospec(lambda: None)
