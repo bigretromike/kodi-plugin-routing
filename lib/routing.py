@@ -24,9 +24,9 @@ try:
 except ImportError:
     from urllib.parse import urlsplit, parse_qs
 try:
-    from urllib import urlencode
+    from urllib import urlencode, quote as q, unquote as uq
 except ImportError:
-    from urllib.parse import urlencode
+    from urllib.parse import urlencode, quote as q, unquote as uq
 
 try:
     import xbmc
@@ -188,7 +188,9 @@ class UrlRule:
         """
         # match = self._regex.search(urlsplit(path).path)
         match = self._regex.search(path)
-        return match.groupdict() if match else None
+        if match is None:
+            return None
+        return dict((k, uq(uq(v))) for k, v in match.groupdict().items())
 
     def exact_match(self, path):
         return not self._has_args and self._pattern == path
@@ -200,14 +202,15 @@ class UrlRule:
         if args:
             # Replace the named groups %s and format
             try:
+                args = tuple(q(q(str(x), ''), '') for x in args)
                 return re.sub(r'{[A-z_][A-z0-9_]*}', r'%s', self._pattern) % args
             except TypeError:
                 return None
 
         # We need to find the keys from kwargs that occur in our pattern.
         # Unknown keys are pushed to the query string.
-        url_kwargs = dict(((k, v) for k, v in list(kwargs.items()) if k in self._keywords))
-        qs_kwargs = dict(((k, v) for k, v in list(kwargs.items()) if k not in self._keywords))
+        url_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items()) if k in self._keywords))
+        qs_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items()) if k not in self._keywords))
 
         query = '?' + urlencode(qs_kwargs) if qs_kwargs else ''
         try:
