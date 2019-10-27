@@ -122,6 +122,19 @@ def search():
     # ...
 ```
 
+## Automatic Conversion of Types
+
+- This is disabled by default to protect backwards compatibility.
+
+When you pass an object to the router, then it is converted into a string. In the past, it stayed a string when the router 
+receives it on the other end. If you initialize your `routing.Plugin()` with `convert_args=True`, then it will automatically
+convert simple types like int, float, and bool back into their respective objects, preventing the need to do it yourself.
+
+## Script Support
+
+Plugin Routing was initially designed for Plugins and only Plugins. If you attempt to use it with scripts, services,
+or anything else, then it would error, because it's missing a Handle. You may now initialize a `routing.Script()` to use
+routing in those cases.
 
 ## Creating a dependency in your addon
 
