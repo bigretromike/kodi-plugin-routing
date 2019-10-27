@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import re
 import sys
 try:
@@ -58,11 +60,19 @@ class Addon(object):
 
     def __init__(self, base_url=None, convert_args=False):
         self._rules = {}  # function to list of rules
+        if sys.argv:
+            self.path = urlsplit(sys.argv[0]).path or '/'
+        else:
+            self.path = '/'
+        if len(sys.argv) > 1 and sys.argv[1].isdigit():
+            self.handle = int(sys.argv[1])
+        else:
+            self.handle = -1
         self.args = {}
         self.base_url = base_url
         self.convert_args = convert_args
         if self.base_url is None:
-            self.base_url = xbmcaddon.Addon().getAddonInfo('id')
+            self.base_url = "plugin://" + xbmcaddon.Addon().getAddonInfo('id')
 
     def route_for(self, path):
         """
@@ -73,14 +83,17 @@ class Addon(object):
         if path.startswith(self.base_url):
             path = path.split(self.base_url, 1)[1]
 
+        # only list convert once
+        list_rules = list(self._rules.items())
+
         # first, search for exact matches
-        for view_fun, rules in iter(self._rules.items()):
+        for view_fun, rules in iter(list_rules):
             for rule in rules:
                 if rule.exact_match(path):
                     return view_fun
 
         # then, search for regex matches
-        for view_fun, rules in iter(self._rules.items()):
+        for view_fun, rules in iter(list_rules):
             for rule in rules:
                 if rule.match(path) is not None:
                     return view_fun
@@ -119,14 +132,15 @@ class Addon(object):
             self._rules[func] = []
         self._rules[func].append(rule)
 
-    def run(self, argv=sys.argv):
+    def run(self, argv=None):
         pass
 
     def redirect(self, path):
         self._dispatch(path)
 
     def _dispatch(self, path):
-        for view_func, rules in iter(self._rules.items()):
+        list_rules = list(self._rules.items())
+        for view_func, rules in iter(list_rules):
             for rule in rules:
                 if not rule.exact_match(path):
                     continue
@@ -135,13 +149,13 @@ class Addon(object):
                 return
 
         # then, search for regex matches
-        for view_func, rules in iter(self._rules.items()):
+        for view_func, rules in iter(list_rules):
             for rule in rules:
                 kwargs = rule.match(path)
                 if kwargs is None:
                     continue
                 if self.convert_args:
-                    kwargs = dict((k, try_convert(v)) for k, v in kwargs.items())
+                    kwargs = dict((k, try_convert(v)) for k, v in list(kwargs.items()))
                 log("Dispatching to '%s', args: %s" % (view_func.__name__, kwargs))
                 view_func(**kwargs)
                 return
@@ -165,7 +179,10 @@ class Plugin(Addon):
             raise TypeError('There was no handle provided. This needs to be called from a Kodi Plugin.')
         self.handle = int(sys.argv[1]) if sys.argv[1].isdigit() else -1
 
-    def run(self, argv=sys.argv):
+    def run(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+        self.path = self.path.rstrip('/')
         # argv[1] is handle, so skip to 2
         if len(argv) > 2:
             # parse query
@@ -183,7 +200,10 @@ class Script(Addon):
     def __init__(self, base_url=None, convert_args=False):
         Addon.__init__(self, base_url, convert_args)
 
-    def run(self, argv=sys.argv):
+    def run(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+        self.path = self.path.rstrip('/')
         if len(argv) > 1:
             # parse query
             self.args = parse_qs(argv[1].lstrip('?'))
@@ -198,16 +218,17 @@ class Script(Addon):
 
 class UrlRule(object):
     def __init__(self, pattern):
-        arg_regex = re.compile('<([A-z][A-z0-9]*)>')
+        pattern = pattern.rstrip('/')
+        arg_regex = re.compile('<([A-z_][A-z0-9_]*)>')
         self._has_args = bool(arg_regex.search(pattern))
 
-        kw_pattern = r'<(?:[^:]+:)?([A-z][A-z0-9]*)>'
+        kw_pattern = r'<(?:[^:]+:)?([A-z_][A-z0-9_]*)>'
         self._pattern = re.sub(kw_pattern, '{\\1}', pattern)
         self._keywords = re.findall(kw_pattern, pattern)
 
-        p = re.sub('<([A-z][A-z0-9]*)>', '<string:\\1>', pattern)
-        p = re.sub('<string:([A-z][A-z0-9]*)>', '(?P<\\1>[^/]+?)', p)
-        p = re.sub('<path:([A-z][A-z0-9]*)>', '(?P<\\1>.*)', p)
+        p = re.sub('<([A-z_][A-z0-9_]*)>', '<string:\\1>', pattern)
+        p = re.sub('<string:([A-z_][A-z0-9_]*)>', '(?P<\\1>[^/]+?)', p)
+        p = re.sub('<path:([A-z_][A-z0-9_]*)>', '(?P<\\1>.*)', p)
         self._compiled_pattern = p
         self._regex = re.compile('^' + p + '$')
 
@@ -218,10 +239,7 @@ class UrlRule(object):
         """
         # match = self._regex.search(urlsplit(path).path)
         match = self._regex.search(path)
-        if match is None:
-            return None
-        match = dict((k, unquote(unquote(v))) for k, v in match.groupdict().items())
-        return match
+        return match.groupdict() if match else None
 
     def exact_match(self, path):
         return not self._has_args and self._pattern == path
@@ -233,15 +251,14 @@ class UrlRule(object):
         if args:
             # Replace the named groups %s and format
             try:
-                args = tuple(quote(quote(str(x), ''), '') for x in args)
-                return re.sub(r'{[A-z][A-z0-9]*}', r'%s', self._pattern) % args
+                return re.sub(r'{[A-z_][A-z0-9_]*}', r'%s', self._pattern) % args
             except TypeError:
                 return None
 
         # We need to find the keys from kwargs that occur in our pattern.
         # Unknown keys are pushed to the query string.
-        url_kwargs = dict(((k, v) for k, v in kwargs.items() if k in self._keywords))
-        qs_kwargs = dict(((k, v) for k, v in kwargs.items() if k not in self._keywords))
+        url_kwargs = dict(((k, v) for k, v in list(kwargs.items()) if k in self._keywords))
+        qs_kwargs = dict(((k, v) for k, v in list(kwargs.items()) if k not in self._keywords))
 
         query = '?' + urlencode(qs_kwargs) if qs_kwargs else ''
         try:

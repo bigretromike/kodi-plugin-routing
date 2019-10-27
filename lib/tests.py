@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import pytest
 import mock
 from routing import Plugin, Script, UrlRule, RoutingError
@@ -65,14 +67,14 @@ def test_url_for(plugin):
 
 
 def test_url_for_kwargs(plugin):
-    f = lambda a, b2: None
-    plugin.route("/foo/<a>/<b2>")(f)
-    assert plugin.url_for(f, a=1, b2=2) == plugin.base_url + "/foo/1/2"
+    f = lambda a, var_with_num_underscore2: None
+    plugin.route("/foo/<a>/<var_with_num_underscore2>")(f)
+    assert plugin.url_for(f, a=1, var_with_num_underscore2=2) == plugin.base_url + "/foo/1/2"
 
 
 def test_url_for_args(plugin):
-    f = lambda a, b2, c, d: None
-    plugin.route("/<a>/<b2>/<c>/<d>")(f)
+    f = lambda a, var_with_num_underscore2, c, d: None
+    plugin.route("/<a>/<var_with_num_underscore2>/<c>/<d>")(f)
     assert plugin.url_for(f, 1, 2.6, True, 'baz') == plugin.base_url + "/1/2.6/True/baz"
 
 
@@ -83,19 +85,18 @@ def test_route_for(plugin):
 
 
 def test_route_for_args(plugin):
-    f = lambda: None
+    f = lambda a, var_with_num_underscore2: None
     g = lambda: (None, None)  # just to make sure that they are easily different
-    plugin.route("/foo/<a>/<b2>")(f)
+    plugin.route("/foo/<a>/<var_with_num_underscore2>")(f)
     plugin.route("/foo/a/b")(g)
 
     # due to the unpredictable sorting of dict, just do it 100 times to see if it fails
-    # This is done because the exact_match processing did not exist, and it failed depending on order
-    for i in range(0, 100):
+    for _ in range(0, 100):
         assert plugin.route_for(plugin.base_url + "/foo/1/2") is f
         assert plugin.route_for(plugin.base_url + "/foo/a/b") is g
 
 
-def test_path_args(plugin):
+def test_path_query(plugin):
     # full test to ensure that a path is both created properly and preserved throughout
     url = 'http://foo.bar:80/baz/bax.json?foo=bar&baz=bay'
     f = mock.create_autospec(lambda a: None)
@@ -115,6 +116,16 @@ def test_dispatch(plugin):
     f.assert_called_with()
 
 
+def test_path(plugin):
+    f = mock.create_autospec(lambda: None)
+    plugin.route("/foo")(f)
+    plugin.run(['plugin://py.test/foo', '0'])
+    assert plugin.path == '/foo'
+    plugin.route("/foo/bar/baz")(f)
+    plugin.run(['plugin://py.test/foo/bar/baz', '0'])
+    assert plugin.path == '/foo/bar/baz'
+
+
 def test_no_route(plugin):
     f = lambda a: None
     plugin.route("/foo/<a>/<b>")(f)
@@ -132,6 +143,33 @@ def test_arg_parsing(plugin):
     plugin.route("/foo")(f)
     plugin.run(['plugin://py.test/foo', '0', '?bar=baz&bar2=baz2'])
     assert plugin.args['bar'][0] == 'baz' and plugin.args['bar2'][0] == 'baz2'
+
+
+def test_trailing_slash_in_route_definition(plugin):
+    """ Should call registered route with trailing slash. """
+    f = mock.create_autospec(lambda: None)
+    plugin.route("/foo/")(f)
+    plugin.run(['plugin://py.test/foo', '0'])
+    assert f.call_count == 1
+
+
+def test_trailing_slashes_in_run(plugin):
+    """ Should call registered route without trailing slash. """
+    f = mock.create_autospec(lambda: None)
+    plugin.route("/foo")(f)
+    plugin.run(['plugin://py.test/foo/', '0'])
+    assert f.call_count == 1
+
+
+def test_trailing_slash_handling_for_root(plugin):
+    f = mock.create_autospec(lambda: None)
+    plugin.route("/<a>")(lambda: None)
+    plugin.route("/")(f)
+    plugin.run(['plugin://py.test/', '0'])
+    plugin.run(['plugin://py.test', '0'])
+    assert f.call_count == 2
+    with pytest.raises(RoutingError):
+        plugin.run(['plugin://py.test/a/b', '0'])
 
 
 def test_arg_conversion(plugin_convert):
