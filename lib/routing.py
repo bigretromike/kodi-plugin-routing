@@ -187,6 +187,7 @@ class Plugin(Addon):
         if len(argv) > 2:
             # parse query
             self.args = parse_qs(argv[2].lstrip('?'))
+            self.args = dict((k, list(uq(uq(v2)) for v2 in v)) for k, v in self.args.items())
         # handle ['plugin.video.fun/some/menu']
         path = urlsplit(argv[0]).path or '/'
         self._dispatch(path)
@@ -207,6 +208,7 @@ class Script(Addon):
         if len(argv) > 1:
             # parse query
             self.args = parse_qs(argv[1].lstrip('?'))
+            self.args = dict((k, list(uq(uq(v2)) for v2 in v)) for k, v in self.args.items())
             # handle ['script.module.fun', '/do/something']
             path = urlsplit(argv[1]).path or '/'
         else:
@@ -260,8 +262,10 @@ class UrlRule(object):
 
         # We need to find the keys from kwargs that occur in our pattern.
         # Unknown keys are pushed to the query string.
-        url_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items()) if k in self._keywords))
-        qs_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items()) if k not in self._keywords))
+        url_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items())
+                           if k in self._keywords))
+        qs_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items())
+                          if k not in self._keywords))
 
         query = '?' + urlencode(qs_kwargs) if qs_kwargs else ''
         try:
