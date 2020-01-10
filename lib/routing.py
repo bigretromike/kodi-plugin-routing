@@ -106,8 +106,7 @@ class Plugin:
                 path = rule.make_path(*args, **kwargs)
                 if path is not None:
                     return self.url_for_path(path)
-        raise RoutingError("No known paths to '{0}' with args {1} and "
-                           "kwargs {2}".format(func.__name__, args, kwargs))
+        raise RoutingError("No known paths to '{0}' with args {1} and kwargs {2}".format(func.__name__, args, kwargs))
 
     def url_for_path(self, path):
         """
@@ -137,6 +136,7 @@ class Plugin:
         self.path = self.path.rstrip('/')
         if len(argv) > 2:
             self.args = parse_qs(argv[2].lstrip('?'))
+            self.args = dict((k, list(uq(uq(v2)) for v2 in v)) for k, v in self.args.items())
         self._dispatch(self.path)
 
     def redirect(self, path):

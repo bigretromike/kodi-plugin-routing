@@ -39,9 +39,14 @@ def test_make_path():
     assert rule.make_path(1) is None
 
 
-def test_make_path_should_urlencode_args():
-    rule = UrlRule("/foo")
-    assert rule.make_path(bar="b a&r") == "/foo?bar=b+a%26r"
+def test_make_path_should_urlencode_args(plugin):
+    f = mock.create_autospec(lambda: None)
+    plugin.route('/foo')(f)
+    # we wanted double quote for the +, %, and any others that might be in the string
+    assert plugin.url_for(f, bar='b a&r+c') == plugin.base_url + '/foo?bar=b%252520a%252526r%25252Bc'
+    plugin.run(['plugin://py.test/foo', '0', '?bar=b%252520a%252526r%25252Bc'])
+    f.assert_called_with()
+    assert plugin.args['bar'] == ['b a&r+c']
 
 
 def test_url_for_path():
@@ -90,6 +95,7 @@ def test_dispatch(plugin):
     plugin.route("/foo")(f)
     plugin.run(['plugin://py.test/foo', '0', '?bar=baz'])
     f.assert_called_with()
+    assert plugin.args['bar'] == ['baz']
 
 
 def test_path(plugin):
