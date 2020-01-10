@@ -106,7 +106,8 @@ class Plugin:
                 path = rule.make_path(*args, **kwargs)
                 if path is not None:
                     return self.url_for_path(path)
-        raise RoutingError("No known paths to '{0}' with args {1} and kwargs {2}".format(func.__name__, args, kwargs))
+        raise RoutingError("No known paths to '{0}' with args {1} "
+                           "and kwargs {2}".format(func.__name__, args, kwargs))
 
     def url_for_path(self, path):
         """
@@ -209,8 +210,10 @@ class UrlRule:
 
         # We need to find the keys from kwargs that occur in our pattern.
         # Unknown keys are pushed to the query string.
-        url_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items()) if k in self._keywords))
-        qs_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items()) if k not in self._keywords))
+        url_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items())
+                           if k in self._keywords))
+        qs_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items())
+                          if k not in self._keywords))
 
         query = '?' + urlencode(qs_kwargs) if qs_kwargs else ''
         try:
