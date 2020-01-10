@@ -182,15 +182,14 @@ class Plugin(Addon):
     def run(self, argv=None):
         if argv is None:
             argv = sys.argv
-        self.path = self.path.rstrip('/')
         # argv[1] is handle, so skip to 2
         if len(argv) > 2:
             # parse query
             self.args = parse_qs(argv[2].lstrip('?'))
             self.args = dict((k, list(uq(uq(v2)) for v2 in v)) for k, v in self.args.items())
         # handle ['plugin.video.fun/some/menu']
-        path = urlsplit(argv[0]).path or '/'
-        self._dispatch(path)
+        self.path = urlsplit(argv[0]).path or '/'
+        self._dispatch(self.path)
 
 
 class Script(Addon):
@@ -204,7 +203,6 @@ class Script(Addon):
     def run(self, argv=None):
         if argv is None:
             argv = sys.argv
-        self.path = self.path.rstrip('/')
         if len(argv) > 1:
             # parse query
             self.args = parse_qs(argv[1].lstrip('?'))
@@ -215,6 +213,7 @@ class Script(Addon):
             # handle ['script.module.fun/do/something']
             temp = urlsplit(argv[0]).path
             path = temp if temp != self.base_url else '/'
+        self.path = path
         self._dispatch(path)
 
 
