@@ -85,10 +85,8 @@ def test_route_for_args(plugin):
     plugin.route("/foo/<a>/<var_with_num_underscore2>")(f)
     plugin.route("/foo/a/b")(g)
 
-    # due to the unpredictable sorting of dict, just do it 100 times to see if it fails
-    for _ in range(0, 100):
-        assert plugin.route_for(plugin.base_url + "/foo/1/2") is f
-        assert plugin.route_for(plugin.base_url + "/foo/a/b") is g
+    assert plugin.route_for(plugin.base_url + "/foo/1/2") is f
+    assert plugin.route_for(plugin.base_url + "/foo/a/b") is g
 
 
 def test_dispatch(plugin):
