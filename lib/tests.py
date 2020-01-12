@@ -57,7 +57,7 @@ def test_make_path_should_urlencode_args(plugin):
     assert plugin.url_for(f, bar='b a&r+c') == plugin.base_url + '/foo?bar=b+a%26r%2Bc'
     plugin.run(['plugin://py.test/foo', '0', '?bar=b+a%26r%2Bc'])
     f.assert_called_with()
-    assert plugin.args['bar'] == ['b a&r+c']
+    assert plugin.args['bar'][0] == 'b a&r+c'
 
 
 def test_url_for_path():
@@ -117,7 +117,7 @@ def test_dispatch(plugin):
     plugin.route("/foo")(f)
     plugin.run(['plugin://py.test/foo', '0', '?bar=baz'])
     f.assert_called_with()
-    assert plugin.args['bar'] == ['baz']
+    assert plugin.args['bar'][0] == 'baz'
 
 
 def test_path(plugin):
