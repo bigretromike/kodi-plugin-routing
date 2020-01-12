@@ -24,9 +24,9 @@ try:
 except ImportError:
     from urllib.parse import urlsplit, parse_qs
 try:
-    from urllib import urlencode, quote as q, unquote as uq
+    from urllib import urlencode
 except ImportError:
-    from urllib.parse import urlencode, quote as q, unquote as uq
+    from urllib.parse import urlencode
 
 try:
     import xbmc
@@ -137,7 +137,6 @@ class Plugin:
         self.path = self.path.rstrip('/')
         if len(argv) > 2:
             self.args = parse_qs(argv[2].lstrip('?'))
-            self.args = dict((k, list(uq(uq(v2)) for v2 in v)) for k, v in self.args.items())
         self._dispatch(self.path)
 
     def redirect(self, path):
@@ -189,9 +188,7 @@ class UrlRule:
         """
         # match = self._regex.search(urlsplit(path).path)
         match = self._regex.search(path)
-        if match is None:
-            return None
-        return dict((k, uq(uq(v))) for k, v in match.groupdict().items())
+        return match.groupdict() if match else None
 
     def exact_match(self, path):
         return not self._has_args and self._pattern == path
@@ -203,17 +200,14 @@ class UrlRule:
         if args:
             # Replace the named groups %s and format
             try:
-                args = tuple(q(q(str(x), ''), '') for x in args)
                 return re.sub(r'{[A-z_][A-z0-9_]*}', r'%s', self._pattern) % args
             except TypeError:
                 return None
 
         # We need to find the keys from kwargs that occur in our pattern.
         # Unknown keys are pushed to the query string.
-        url_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items())
-                           if k in self._keywords))
-        qs_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items())
-                          if k not in self._keywords))
+        url_kwargs = dict(((k, v) for k, v in list(kwargs.items()) if k in self._keywords))
+        qs_kwargs = dict(((k, v) for k, v in list(kwargs.items()) if k not in self._keywords))
 
         query = '?' + urlencode(qs_kwargs) if qs_kwargs else ''
         try:

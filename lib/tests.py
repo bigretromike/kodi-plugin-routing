@@ -44,8 +44,8 @@ def test_make_path_should_urlencode_args(plugin):
     plugin.route('/foo')(f)
     # we wanted double quote for the +, %, and any others that might be in the string
     assert plugin.url_for(f, bar='b a&r+c') == \
-        plugin.base_url + '/foo?bar=b%252520a%252526r%25252Bc'
-    plugin.run(['plugin://py.test/foo', '0', '?bar=b%252520a%252526r%25252Bc'])
+        plugin.base_url + '/foo?bar=b+a%26r%2Bc'
+    plugin.run(['plugin://py.test/foo', '0', '?bar=b+a%26r%2Bc'])
     f.assert_called_with()
     assert plugin.args['bar'] == ['b a&r+c']
 
