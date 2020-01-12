@@ -193,7 +193,7 @@ class Plugin(Addon):
         if len(argv) > 2:
             self.args = parse_qs(argv[2].lstrip('?'))
         # handle ['plugin.video.fun/some/menu']
-        self.path = urlsplit(argv[0]).path or '/'
+        self.path = urlsplit(argv[0]).path or ''
         self._dispatch(self.path)
 
 
@@ -212,11 +212,11 @@ class Script(Addon):
             # parse query
             self.args = parse_qs(argv[1].lstrip('?'))
             # handle ['script.module.fun', '/do/something']
-            path = urlsplit(argv[1]).path or '/'
+            path = urlsplit(argv[1]).path or ''
         else:
             # handle ['script.module.fun/do/something']
             temp = urlsplit(argv[0]).path
-            path = temp if temp != self.base_url else '/'
+            path = temp if temp != self.base_url else ''
         self.path = path
         self._dispatch(path)
 
