@@ -42,7 +42,7 @@ def test_make_path():
 def test_make_path_should_urlencode_args(plugin):
     f = mock.create_autospec(lambda: None)
     plugin.route('/foo')(f)
-    # we wanted double quote for the +, %, and any others that might be in the string
+
     assert plugin.url_for(f, bar='b a&r+c') == \
         plugin.base_url + '/foo?bar=b+a%26r%2Bc'
     plugin.run(['plugin://py.test/foo', '0', '?bar=b+a%26r%2Bc'])
