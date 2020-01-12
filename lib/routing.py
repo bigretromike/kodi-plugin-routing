@@ -24,9 +24,9 @@ try:
 except ImportError:
     from urllib.parse import urlsplit, parse_qs
 try:
-    from urllib import urlencode, quote as q, unquote as uq
+    from urllib import urlencode
 except ImportError:
-    from urllib.parse import urlencode, quote as q, unquote as uq
+    from urllib.parse import urlencode
 
 try:
     import xbmc
@@ -133,7 +133,13 @@ class Addon(object):
         self._rules[func].append(rule)
 
     def run(self, argv=None):
-        pass
+        if argv is None:
+            argv = sys.argv
+        self.path = urlsplit(argv[0]).path
+        self.path = self.path.rstrip('/')
+        if len(argv) > 2:
+            self.args = parse_qs(argv[2].lstrip('?'))
+        self._dispatch(self.path)
 
     def redirect(self, path):
         self._dispatch(path)
@@ -182,11 +188,10 @@ class Plugin(Addon):
     def run(self, argv=None):
         if argv is None:
             argv = sys.argv
-        # argv[1] is handle, so skip to 2
+        self.path = urlsplit(argv[0]).path
+        self.path = self.path.rstrip('/')
         if len(argv) > 2:
-            # parse query
             self.args = parse_qs(argv[2].lstrip('?'))
-            self.args = dict((k, list(uq(uq(v2)) for v2 in v)) for k, v in self.args.items())
         # handle ['plugin.video.fun/some/menu']
         self.path = urlsplit(argv[0]).path or '/'
         self._dispatch(self.path)
@@ -206,7 +211,6 @@ class Script(Addon):
         if len(argv) > 1:
             # parse query
             self.args = parse_qs(argv[1].lstrip('?'))
-            self.args = dict((k, list(uq(uq(v2)) for v2 in v)) for k, v in self.args.items())
             # handle ['script.module.fun', '/do/something']
             path = urlsplit(argv[1]).path or '/'
         else:
@@ -240,9 +244,7 @@ class UrlRule(object):
         """
         # match = self._regex.search(urlsplit(path).path)
         match = self._regex.search(path)
-        if match is None:
-            return None
-        return dict((k, uq(uq(v))) for k, v in match.groupdict().items())
+        return match.groupdict() if match else None
 
     def exact_match(self, path):
         return not self._has_args and self._pattern == path
@@ -254,17 +256,14 @@ class UrlRule(object):
         if args:
             # Replace the named groups %s and format
             try:
-                args = tuple(q(q(str(x), ''), '') for x in args)
                 return re.sub(r'{[A-z_][A-z0-9_]*}', r'%s', self._pattern) % args
             except TypeError:
                 return None
 
         # We need to find the keys from kwargs that occur in our pattern.
         # Unknown keys are pushed to the query string.
-        url_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items())
-                           if k in self._keywords))
-        qs_kwargs = dict(((k, q(q(str(v), ''), '')) for k, v in list(kwargs.items())
-                          if k not in self._keywords))
+        url_kwargs = dict(((k, v) for k, v in list(kwargs.items()) if k in self._keywords))
+        qs_kwargs = dict(((k, v) for k, v in list(kwargs.items()) if k not in self._keywords))
 
         query = '?' + urlencode(qs_kwargs) if qs_kwargs else ''
         try:
