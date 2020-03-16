@@ -19,12 +19,23 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import pytest
 import mock
-from routing import Plugin, UrlRule, RoutingError
+from routing import Plugin, Script, UrlRule, RoutingError
 
 
 @pytest.fixture()
 def plugin():
     return Plugin('plugin://py.test')
+
+
+@pytest.fixture()
+def plugin_convert():
+    return Plugin('plugin://py.test', convert_args=True)
+
+
+# Normally, we'd be testing both, but there's currently nothing that Script does and Plugin doesn't do
+@pytest.fixture()
+def script():
+    return Script('script://py.test')
 
 
 def test_match():
@@ -43,8 +54,7 @@ def test_make_path_should_urlencode_args(plugin):
     f = mock.create_autospec(lambda: None)
     plugin.route('/foo')(f)
 
-    assert plugin.url_for(f, bar='b a&r+c') == \
-        plugin.base_url + '/foo?bar=b+a%26r%2Bc'
+    assert plugin.url_for(f, bar='b a&r+c') == plugin.base_url + '/foo?bar=b+a%26r%2Bc'
     plugin.run(['plugin://py.test/foo', '0', '?bar=b+a%26r%2Bc'])
     f.assert_called_with()
     assert plugin.args['bar'][0] == 'b a&r+c'
@@ -87,6 +97,19 @@ def test_route_for_args(plugin):
 
     assert plugin.route_for(plugin.base_url + "/foo/1/2") is f
     assert plugin.route_for(plugin.base_url + "/foo/a/b") is g
+
+
+def test_path_query(plugin):
+    # full test to ensure that a path is both created properly and preserved throughout
+    url = 'http://foo.bar:80/baz/bax.json?foo=bar&baz=bay'
+    f = mock.create_autospec(lambda a: None)
+
+    plugin.route('/do/<path:a>')(f)
+    path = plugin.url_for(f, url)
+    assert plugin.route_for(path) is f
+    plugin.run([path, '0', '?foo=bar&baz=bay'])
+    f.assert_called_with(url)
+    assert plugin.args['foo'][0] == 'bar' and plugin.args['baz'][0] == 'bay'
 
 
 def test_dispatch(plugin):
@@ -151,3 +174,10 @@ def test_trailing_slash_handling_for_root(plugin):
     assert f.call_count == 2
     with pytest.raises(RoutingError):
         plugin.run(['plugin://py.test/a/b', '0'])
+
+
+def test_arg_conversion(plugin_convert):
+    f = mock.create_autospec(lambda a, b2, c, d: None)
+    plugin_convert.route("/foo/<a>/<b2>/<c>/<d>")(f)
+    plugin_convert.run(['plugin://py.test/foo/bar/true/16.4/9', '0', ''])
+    f.assert_called_with('bar', True, 16.4, 9)

@@ -24,9 +24,9 @@ try:
 except ImportError:
     from urllib.parse import urlsplit, parse_qs
 try:
-    from urllib import urlencode
+    from urllib import urlencode, quote_plus, unquote_plus
 except ImportError:
-    from urllib.parse import urlencode
+    from urllib.parse import urlencode, quote_plus, unquote_plus
 
 try:
     import xbmc
@@ -45,19 +45,20 @@ class RoutingError(Exception):
     pass
 
 
-class Plugin:
+class Addon(object):
     """
-    :ivar handle: The plugin handle from kodi
-    :type handle: int
-
-    :ivar path: The current path
-    :type path: byte string
-
+    The base class for routing.Plugin, Script, and any others that may be added
     :ivar args: The parsed query string.
     :type args: dict of byte strings
+
+    :ivar base_url: the base_url of the addon, ex. plugin://plugin.video.something_plugin
+    :type base_url: str
+
+    :ivar convert_args: Convert arguments to basic types
+    :type convert_args: bool
     """
 
-    def __init__(self, base_url=None):
+    def __init__(self, base_url=None, convert_args=False):
         self._rules = {}  # function to list of rules
         if sys.argv:
             self.path = urlsplit(sys.argv[0]).path or '/'
@@ -69,6 +70,7 @@ class Plugin:
             self.handle = -1
         self.args = {}
         self.base_url = base_url
+        self.convert_args = convert_args
         if self.base_url is None:
             self.base_url = "plugin://" + xbmcaddon.Addon().getAddonInfo('id')
 
@@ -106,8 +108,8 @@ class Plugin:
                 path = rule.make_path(*args, **kwargs)
                 if path is not None:
                     return self.url_for_path(path)
-        raise RoutingError("No known paths to '{0}' with args {1} "
-                           "and kwargs {2}".format(func.__name__, args, kwargs))
+        raise RoutingError("No known paths to '{0}' with args {1} and "
+                           "kwargs {2}".format(func.__name__, args, kwargs))
 
     def url_for_path(self, path):
         """
@@ -131,13 +133,7 @@ class Plugin:
         self._rules[func].append(rule)
 
     def run(self, argv=None):
-        if argv is None:
-            argv = sys.argv
-        self.path = urlsplit(argv[0]).path
-        self.path = self.path.rstrip('/')
-        if len(argv) > 2:
-            self.args = parse_qs(argv[2].lstrip('?'))
-        self._dispatch(self.path)
+        pass
 
     def redirect(self, path):
         self._dispatch(path)
@@ -158,14 +154,68 @@ class Plugin:
                 kwargs = rule.match(path)
                 if kwargs is None:
                     continue
+                if self.convert_args:
+                    kwargs = dict((k, try_convert(v)) for k, v in list(kwargs.items()))
                 log("Dispatching to '%s', args: %s" % (view_func.__name__, kwargs))
                 view_func(**kwargs)
                 return
         raise RoutingError('No route to path "%s"' % path)
 
 
-class UrlRule:
+class Plugin(Addon):
+    """
+    A routing handler bound to a kodi plugin
+    :ivar handle: The plugin handle from kodi
+    :type handle: int
+    """
 
+    def __init__(self, base_url=None, convert_args=False):
+        self.base_url = base_url
+        if self.base_url is None:
+            self.base_url = "plugin://" + xbmcaddon.Addon().getAddonInfo('id')
+        Addon.__init__(self, self.base_url, convert_args)
+        if len(sys.argv) < 2:
+            # we are probably not dealing with a plugin, or it was called incorrectly from an addon
+            raise TypeError('There was no handle provided. This needs to be called from a Kodi Plugin.')
+        self.handle = int(sys.argv[1]) if sys.argv[1].isdigit() else -1
+
+    def run(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+        self.path = urlsplit(argv[0]).path
+        self.path = self.path.rstrip('/')
+        if len(argv) > 2:
+            self.args = parse_qs(argv[2].lstrip('?'))
+        self._dispatch(self.path)
+
+
+class Script(Addon):
+    """
+    A routing handler bound to a kodi script
+    """
+
+    def __init__(self, base_url=None, convert_args=False):
+        Addon.__init__(self, base_url, convert_args)
+
+    def run(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+
+        if len(argv) > 1:
+            # parse query
+            self.args = parse_qs(argv[1].lstrip('?'))
+            # handle ['script.module.fun', '/do/something']
+            path = urlsplit(argv[1]).path or '/'
+        else:
+            # handle ['script.module.fun/do/something']
+            temp = urlsplit(argv[0]).path
+            path = temp if temp != self.base_url else ''
+
+        self.path = path.rstrip('/')
+        self._dispatch(path)
+
+
+class UrlRule(object):
     def __init__(self, pattern):
         pattern = pattern.rstrip('/')
         arg_regex = re.compile('<([A-z_][A-z0-9_]*)>')
@@ -188,7 +238,7 @@ class UrlRule:
         """
         # match = self._regex.search(urlsplit(path).path)
         match = self._regex.search(path)
-        return match.groupdict() if match else None
+        return dict((k, unquote_plus(v)) for k, v in match.groupdict().items()) if match else None
 
     def exact_match(self, path):
         return not self._has_args and self._pattern == path
@@ -200,13 +250,15 @@ class UrlRule:
         if args:
             # Replace the named groups %s and format
             try:
+                args = tuple(quote_plus(str(a), '') for a in args)
                 return re.sub(r'{[A-z_][A-z0-9_]*}', r'%s', self._pattern) % args
             except TypeError:
                 return None
 
         # We need to find the keys from kwargs that occur in our pattern.
         # Unknown keys are pushed to the query string.
-        url_kwargs = dict(((k, v) for k, v in list(kwargs.items()) if k in self._keywords))
+        url_kwargs = dict(((k, quote_plus(str(v), '')) for k, v in list(kwargs.items()) if k in self._keywords))
+        # this is quoted by urlencode
         qs_kwargs = dict(((k, v) for k, v in list(kwargs.items()) if k not in self._keywords))
 
         query = '?' + urlencode(qs_kwargs) if qs_kwargs else ''
@@ -217,3 +269,32 @@ class UrlRule:
 
     def __str__(self):
         return b"Rule(pattern=%s, keywords=%s)" % (self._pattern, self._keywords)
+
+
+def try_convert(value):
+    """
+    Try to convert to some common types
+    :param value: the string to convert
+    :type value: str
+    """
+    # for some of these, they are simplistic and not the generally preferred way
+    # this is a special case, so I don't care
+
+    # try to convert to int
+    if all(x.isdigit() for x in value):
+        return int(value)
+
+    # try to convert to float. We've already check ints, so just try/except
+    try:
+        return float(value)
+    except:
+        pass
+
+    # try to convert to bool
+    if value.lower() == 'true':
+        return True
+    if value.lower() == 'false':
+        return False
+
+    # the original is str, so we can "convert" to str by just returning
+    return value
